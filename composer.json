@@ -1,0 +1,48 @@
+{
+    "name": "omnilab/noaa",
+    "type": "library",
+    "description": "Omnilab NOAA: weather and climate observations as series at a point - the station records of the world from NCEI's Access Data Service (GHCN-Daily by day, the Global Summary of the Month and of the Year: TMAX, TMIN, TAVG, PRCP, SNOW, AWND... in metric units) at the nearest station that has them or at a station named, and, for a point of the United States, the National Weather Service's observations of the nearest station (seven days back) joined to its grid's forecast (seven days ahead); no key.",
+    "keywords": [
+        "science",
+        "weather",
+        "climate",
+        "observations",
+        "forecast",
+        "ghcn",
+        "noaa",
+        "ncei",
+        "nws",
+        "omnilab"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Marco Meyer",
+            "email": "marco.meyer@glitchr.io"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "glitchr/omnilab": "^1.0@dev",
+        "symfony/http-client": "^6.4|^7.0|^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Omnilab\\Noaa\\": ""
+        },
+        "exclude-from-classmap": [
+            "/Tests/"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Omnilab\\Noaa\\Tests\\": "Tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

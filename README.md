@@ -4,9 +4,10 @@ NOAA's weather and climate observations for [glitchr/omnilab](https://github.com
 as series at a point: the station records of the whole world from NCEI's Access Data Service -
 GHCN-Daily by day, the Global Summary of the Month and of the Year, by the elements' own names
 (`TMAX`, `TMIN`, `TAVG`, `PRCP`, `SNOW`, `AWND`...) in metric units - at the nearest station that
-has them over the period, or at a station named; and, for a point of the United States, the
+has them over the period, or at a GHCN station named (`ghcn:USW00094728`); and, for a point of the United States, the
 National Weather Service's observations of the nearest station (seven days back) joined to the
-forecast of its grid (seven days ahead). No key.
+forecast of its grid (seven days ahead), or of a station named (`nws.station:KNYC`). A station
+is an entity too: its name, place, elevation and the period its records cover. No key.
 
 ```php
 $noaa = (new NoaaSourceFactory($http))->create(['mailto' => 'support@glitchr.io']);
@@ -16,14 +17,20 @@ $tmax->label;                 // STRASBOURG ENTZHEIM, FR (daily-summaries:FR0000
 $tmax->values();              // 30.7 33.7 37.6 36.3 33.4 29.9 30.0 (°C)
 $prcp->max();                 // 14.3 (mm, on the 4th)
 
-// The month's (P1M) or the year's (P1Y) summaries; a station by its id.
+// The month's (P1M) or the year's (P1Y) summaries.
 $noaa->series(new SeriesQuery(['TAVG'], $strasbourg, new \DateTimeImmutable('2025-01-01'), new \DateTimeImmutable('2025-12-31'), 'P1M'));
-$noaa->seriesAt('USW00094728', new SeriesQuery(['TMAX'], $anywhere, $from, $to, SeriesQuery::DAILY));
+
+// A GHCN station in place of the point: its own records (seriesAt(), its method before, is deprecated).
+[$tmax] = $noaa->series(new SeriesQuery(['TMAX'], Identifier::of(Scheme::GHCN, 'USW00094728'), new \DateTimeImmutable('2026-10-01'), new \DateTimeImmutable('2026-10-07'), SeriesQuery::DAILY));
+$tmax->values();              // 24.4 28.3 21.1 16.7 20 15.6 18.3 (°C, Central Park)
+$station = $noaa->entity('ghcn:FR000007190'); // STRASBOURG ENTZHEIM, FR: 48.5492,7.6403, 150 m, records from 1923-05-01
 
 // The NWS, a source of its own: what was observed, then what is forecast.
 $nws = (new NoaaSourceFactory($http))->create(['api' => 'nws', 'mailto' => 'support@glitchr.io']);
 [$temperature] = $nws->series(new SeriesQuery(['temperature'], new Point(40.7789, -73.9692), new \DateTimeImmutable('-1 day'), new \DateTimeImmutable('+1 day')));
 $temperature->label;          // New York City, Central Park (KNYC), then NWS OKX grid 34,45
+$nws->series(new SeriesQuery(['temperature'], Identifier::of(Scheme::NWS_STATION, 'KNYC'), ...)); // that station's, then its grid's
+$nws->entity('nws.station:KNYC');                                                                 // its name, place, elevation, zone
 ```
 
 ```yaml

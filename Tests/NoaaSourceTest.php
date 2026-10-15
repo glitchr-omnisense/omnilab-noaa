@@ -7,7 +7,10 @@ use Omnilab\Exception\ProviderException;
 use Omnilab\Exception\RateLimitedException;
 use Omnilab\Exception\UnavailableException;
 use Omnilab\Model\BBox;
+use Omnilab\Model\Domain;
+use Omnilab\Model\Identifier;
 use Omnilab\Model\Point;
+use Omnilab\Model\Scheme;
 use Omnilab\Model\Series;
 use Omnilab\Noaa\NoaaSource;
 use Omnilab\Noaa\NoaaSourceFactory;
@@ -31,7 +34,12 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  * York (40.7789 N 73.9692 W), its nearest station (KNYC), that station's
  * observations from 2026-10-14 00:00 local time (each cut to the fields
  * read here), its grid's forecast (OKX 34,45, cut to six layers); the
- * point of Strasbourg, outside the NWS's grids (404).
+ * point of Strasbourg, outside the NWS's grids (404). Later that day, for
+ * the stations: NCEI's search for GHCN's USW00094728 (Central Park, its 59
+ * elements) and for an unknown id, the station's data of 2026-10-10 (its
+ * elevation) and its TMAX and PRCP from 2026-10-01 to 07, the data of
+ * an unknown id (an empty list); the NWS's
+ * station KNYC.
  */
 final class NoaaSourceTest extends TestCase
 {
@@ -54,6 +62,11 @@ final class NoaaSourceTest extends TestCase
             parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
             $path = (string) parse_url($url, \PHP_URL_PATH);
             $fixture = match (true) {
+                str_ends_with($path, '/search/v1/data') && isset($query['stations']) => 'USW00094728' === $query['stations'] ? 'ncei-search-station-central-park.json' : 'ncei-search-station-unknown.json',
+                str_ends_with($path, '/data/v1') && 'USW00094728' === ($query['stations'] ?? null) => '2026-10-10' === $query['startDate'] ? 'ncei-data-central-park-day.json' : 'ncei-data-central-park.json',
+                str_ends_with($path, '/data/v1') && 'XX000000000' === ($query['stations'] ?? null) => 'ncei-data-unknown.json',
+                '/stations/KNYC' === $path => 'nws-station-knyc.json',
+                '/points/40.7833,-73.9667' === $path => 'nws-points-new-york.json',
                 str_ends_with($path, '/search/v1/data') && str_starts_with($query['bbox'] ?? '', '0.') => 'ncei-search-pacific.json',
                 str_ends_with($path, '/search/v1/data') && 'daily-summaries' === $query['dataset'] => 'ncei-search-strasbourg-daily.json',
                 str_ends_with($path, '/search/v1/data') => 'ncei-search-strasbourg-monthly.json',
@@ -110,13 +123,71 @@ final class NoaaSourceTest extends TestCase
         self::assertStringContainsString('dataset=global-summary-of-the-month', $this->urls[0]);
     }
 
-    public function testAStationNamed(): void
+    public function testAStationInPlaceOfThePoint(): void
     {
-        [$tmax] = $this->source()->seriesAt('fr000007190', new SeriesQuery(['TMAX'], self::strasbourg(), new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-08-07'), SeriesQuery::DAILY));
+        $central = Identifier::of(Scheme::GHCN, 'USW00094728');
+        [$tmax, $prcp] = $this->source()->series(new SeriesQuery(['TMAX', 'PRCP'], $central, new \DateTimeImmutable('2026-10-01'), new \DateTimeImmutable('2026-10-07'), SeriesQuery::DAILY));
 
+        self::assertCount(1, $this->urls, 'no search: the data alone');
+        self::assertStringContainsString('data/v1?dataset=daily-summaries&stations=USW00094728&startDate=2026-10-01&endDate=2026-10-07&dataTypes=TMAX,PRCP', $this->urls[0]);
+        self::assertSame('NY CITY CENTRAL PARK, NY US (daily-summaries:USW00094728)', $tmax->label);
+        self::assertSame([40.77898, -73.96925, 42.7], [$tmax->place->latitude, $tmax->place->longitude, $tmax->place->elevation]);
+        self::assertSame([24.4, 28.3, 21.1, 16.7, 20.0, 15.6, 18.3], $tmax->values());
+        self::assertSame(3.8, $prcp->max());
+
+        self::assertSame([], $this->source()->series(new SeriesQuery(['TMAX'], Identifier::of(Scheme::GHCN, 'XX000000000'), new \DateTimeImmutable('2026-10-01'), new \DateTimeImmutable('2026-10-07'), SeriesQuery::DAILY)), 'an unknown station: no series');
+    }
+
+    public function testSeriesAtIsDeprecatedAndAnswersAsBefore(): void
+    {
+        $deprecations = [];
+        set_error_handler(static function (int $level, string $message) use (&$deprecations): bool {
+            $deprecations[] = $message;
+
+            return true;
+        }, \E_USER_DEPRECATED);
+        try {
+            [$tmax] = $this->source()->seriesAt('fr000007190', new SeriesQuery(['TMAX'], self::strasbourg(), new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-08-07'), SeriesQuery::DAILY));
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertCount(1, $deprecations);
         self::assertCount(1, $this->urls, 'no search');
         self::assertSame('STRASBOURG ENTZHEIM, FR (daily-summaries:FR000007190)', $tmax->label);
         self::assertSame(37.6, $tmax->max());
+    }
+
+    public function testAStationAsAnEntity(): void
+    {
+        $station = $this->source()->entity('ghcn:USW00094728');
+
+        self::assertSame(['ghcn:USW00094728', 'NY CITY CENTRAL PARK, NY US', 'station', Domain::EARTH], [(string) $station->id, $station->label, $station->kind, $station->domain]);
+        self::assertSame([40.77898, -73.96925, 42.7], [$station->place->latitude, $station->place->longitude, $station->place->elevation]);
+        self::assertSame(['1869-01-01', '2026-10-10', '42.7 m'], [$station->value('period_start'), $station->value('period_end'), (string) $station->property('elevation')]);
+        self::assertCount(59, $station->properties('variable'));
+        self::assertContains('TMAX: 1869-01-01/2026-10-10', array_map('strval', $station->properties('variable')));
+        self::assertSame('https://www.ncei.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:USW00094728/detail', $station->url);
+        self::assertCount(2, $this->urls, 'the search, a day of its data for its elevation');
+        self::assertNull($this->source()->entity('XX000000000'), 'unknown');
+
+        $knyc = $this->source(['api' => 'nws'])->entity('nws.station:KNYC');
+        self::assertSame(['nws.station:KNYC', 'New York City, Central Park', 'station', 'America/New_York', 'ASOS', '46.9 m'], [(string) $knyc->id, $knyc->label, $knyc->kind, $knyc->value('time_zone'), $knyc->value('network'), (string) $knyc->property('elevation')]);
+        self::assertSame([40.78333, -73.96667], [$knyc->place->latitude, $knyc->place->longitude]);
+    }
+
+    public function testAnNwsStationsObservationsThenItsGridsForecast(): void
+    {
+        $now = new \DateTimeImmutable(self::NOW);
+        [$temperature] = $this->source(['api' => 'nws', 'now' => self::NOW])->series(new SeriesQuery(['temperature'], Identifier::of(Scheme::NWS_STATION, 'KNYC'), $now->modify('-1 day'), $now->modify('+1 day')));
+
+        self::assertCount(4, $this->urls, 'the station, its point, its observations, the grid');
+        self::assertStringEndsWith('/stations/KNYC', $this->urls[0]);
+        self::assertStringEndsWith('/points/40.7833,-73.9667', $this->urls[1]);
+        self::assertStringContainsString('/stations/KNYC/observations?start=2026-10-14T04:00:00Z', $this->urls[2]);
+        self::assertStringStartsWith('New York City, Central Park (KNYC), then NWS OKX grid', (string) $temperature->label);
+        self::assertSame(46.9, $temperature->place->elevation, 'the station\'s place');
+        self::assertGreaterThan(24, \count($temperature));
     }
 
     public function testNoStationNearIsASeriesWithoutPoints(): void
@@ -193,8 +264,12 @@ final class NoaaSourceTest extends TestCase
             static fn () => $nws->series(new SeriesQuery(['temperature'], self::strasbourg(), step: 'P1M')),
             static fn () => $nws->series(new SeriesQuery(['temperature'], self::strasbourg(), step: SeriesQuery::DAILY)),
             static fn () => $nws->series(new SeriesQuery(['temperature'], self::strasbourg(), aggregation: Series::MAX)),
-            static fn () => $nws->seriesAt('FR000007190', new SeriesQuery(['TMAX'], self::strasbourg(), step: SeriesQuery::DAILY)),
-            static fn () => $ncei->entity('FR000007190'),
+            static fn () => @$nws->seriesAt('FR000007190', new SeriesQuery(['TMAX'], self::strasbourg(), step: SeriesQuery::DAILY)),
+            static fn () => $ncei->entity('caffeine'),
+            static fn () => $ncei->entity('nws.station:KNYC'),
+            static fn () => $nws->entity('ghcn:USW00094728'),
+            static fn () => $ncei->series(new SeriesQuery(['TMAX'], Identifier::of(Scheme::NWS_STATION, 'KNYC'), step: SeriesQuery::DAILY)),
+            static fn () => $nws->series(new SeriesQuery(['temperature'], Identifier::of(Scheme::GHCN, 'USW00094728'))),
             static fn () => $ncei->search(new Query('Strasbourg')),
             static fn () => $ncei->products(new ProductQuery()),
         ];
@@ -208,14 +283,14 @@ final class NoaaSourceTest extends TestCase
         self::assertSame([], $this->urls);
 
         $this->expectException(\InvalidArgumentException::class);
-        $ncei->seriesAt('FR-0007190', new SeriesQuery(['TMAX'], self::strasbourg(), step: SeriesQuery::DAILY));
+        @$ncei->seriesAt('FR-0007190', new SeriesQuery(['TMAX'], self::strasbourg(), step: SeriesQuery::DAILY));
     }
 
     public function testCapabilitiesAndOptions(): void
     {
         self::assertSame('noaa', (new NoaaSourceFactory())->getName());
-        self::assertSame([Capability::SERIES, Capability::HISTORICAL], $this->source()->capabilities());
-        self::assertSame([Capability::SERIES, Capability::FORECAST, Capability::HISTORICAL], $this->source(['api' => 'nws'])->capabilities());
+        self::assertSame([Capability::ENTITY, Capability::SERIES, Capability::HISTORICAL, Capability::STATION], $this->source()->capabilities());
+        self::assertSame([Capability::ENTITY, Capability::SERIES, Capability::FORECAST, Capability::HISTORICAL, Capability::STATION], $this->source(['api' => 'nws'])->capabilities());
         self::assertSame('noaa', $this->source(['api' => 'nws'])->getName());
 
         $this->expectException(\InvalidArgumentException::class);

@@ -51,8 +51,12 @@ whose values are packed strings (`+0123,1`) - a later addition.
 | Method | Reads | API |
 |---|---|---|
 | `series()` (`ncei`) | GHCN-Daily, GSOM or GSOY element names (`TMAX`, `TMIN`, `TAVG`, `PRCP`, `SNOW`, `SNWD`, `AWND`, `WSF2`, `EMXT`, `DX90`...; any case); a `Point`; the period (a date alone is its day; the last seven days by default); the step above; no aggregation, or the element's own (`TMAX` is the day's `max`) | the search (`dataset`, `bbox` of `radius_km` around the point as north, west, south, east, `startDate`, `endDate`, `dataTypes`), then the data (`stations`, `dataTypes`, `units=metric`, `format=json`, the station's name and place) |
-| `seriesAt($station, SeriesQuery)` (`ncei`) | the same, at a station named by its id (`FR000007190`, `USW00094728`, `JA000047662`): outside the contract, the core having no scheme for a station yet; the query's place is not read | the data alone |
+| `series()` at a station (`ncei`) | the same, the query's place a GHCN station's `Identifier` (`ghcn:FR000007190`, `USW00094728`, `JA000047662`) in place of the point: that station's records. Unknown, or no record and not found: no series (an empty list) | the data alone (and the search when the station has no record over the period, for its place) |
+| `seriesAt($station, SeriesQuery)` (`ncei`) | deprecated (`E_USER_DEPRECATED`): `series()` with the station, the query's point kept for the series of an unknown station | the data alone |
+| `entity()` (`ncei`) | a GHCN station (`ghcn:USW00094728`, its page, or the bare id): its name, place and elevation (`elevation` in m), the period of its records (`period_start`, `period_end`), each element and the period it covers (`variable`: `TMAX: 1869-01-01/2026-10-10`); kind `station`, domain earth | the search (`stations`), then a day of its data (its elevation, which the search does not give) |
+| `entity()` (`nws`) | an NWS station (`nws.station:KNYC`): its name, place, `elevation` (m), `time_zone`, `network` (ASOS...) | `stations/{id}` |
 | `series()` (`nws`) | the NWS's names (`temperature`, `dewpoint`, `relativeHumidity`, `windSpeed`, `windDirection`, `windGust`, `visibility`, `heatIndex`, `windChill` in both; `barometricPressure`, `seaLevelPressure`, `precipitationLastHour`... observed only; `quantitativePrecipitation`, `probabilityOfPrecipitation`, `skyCover`, `apparentTemperature`, `snowfallAmount`... forecast only); a `Point`; the period (today and six days ahead by default, a date alone its whole day in the zone); hourly, or `DAILY` with `mean`, `max`, `min` or `sum` of the day | `points`, the grid's `stations?limit=1`, `stations/{id}/observations?start&end&limit=500` when the period starts before now, the grid when it ends after |
+| `series()` at a station (`nws`) | the same, the query's place an NWS station's `Identifier` (`nws.station:KNYC`): that station's observations, then the forecast of its point's grid; an unknown station: no series | `stations/{id}`, then as above without the grid's station list |
 
 **The nearest station** (`ncei`): the search answers the stations of the box that have one of the
 elements at some time in the period; each element's own date range is read, and the station kept
@@ -94,23 +98,24 @@ Requested Point"): one series per variable without points, after one call.
 Refused before any call: a `BBox` (a station or a grid answers for a point, never an area), a step
 neither API serves (`PT1H` from NCEI, `P1M` from the NWS), an aggregation NCEI does not hold
 (`TMAX` as a mean) or a daily NWS query without one, `seriesAt()` on the NWS, a station id that is
-not one. `entity()`, `search()`, `products()`, `occurrences()`: not supported.
+not one, a station of the other API's scheme (an NWS station of NCEI, a GHCN station of the NWS)
+or a WIGOS id (neither API reads it). `search()`, `products()`, `occurrences()`: not supported.
 
 ## Limits
 
 Neither API publishes a rate (NCEI's CDO v2 allowed five calls a second, 10,000 a day; the NWS
 says its limit is "generous" and answers 429 beyond it, a `RateLimitedException`). A series query
-costs NCEI two calls (one with `seriesAt()`), the NWS two to four (the point, its station, the
+costs NCEI two calls (one at a station), a station two; the NWS two to four (the point, its station, the
 observations, the grid; a week of observations is about 200, one page of 500). The NWS answers
 403 to a call without a User-Agent; a 5xx from either is an `UnavailableException` (retry). NCEI answers 400 with a JSON body that says which parameter it refuses (a
 `ProviderException` with its message).
 
 ## The Collector
 
-Nothing to follow: series have no identity, and the stations are not entities here (the core has
-no scheme for a GHCN station, a WMO station or an NWS station; with one, `entity()` could give a
-station with its place, elevation and elements, and Wikidata's P4136, WIGOS station ID, could lead
-to it).
+Nothing to follow: series have no identity, and a station gives no other base's id (NCEI's search
+does not give a GHCN station's WMO index, which only its station list file holds; the NWS's
+names none). Wikidata keeps WIGOS ids (P4136, 1,594 items on 2026-10-15), which neither API
+reads.
 
 ## Verified, and not
 
@@ -127,7 +132,14 @@ the day before to the day after (KNYC's observations, then the OKX 34,45 grid: 1
 NWS refusing Strasbourg (404), a call without a User-Agent (403), and the observations' next page
 losing the period's start (it goes on a week back: the source stops paging there). GHCN-Daily ended
 on 2026-08-31 for Strasbourg and on 2025-08-24 for Tokyo on 2026-10-15, on 2026-10-11 for Central
-Park: the European and Asian stations come later than the American ones. The fixtures in
+Park: the European and Asian stations come later than the American ones. Later that day, the
+stations: Central Park's records by `ghcn:USW00094728` in place of a point (2026-10-01 to 07:
+`TMAX` 24.4, 28.3, 21.1, 16.7, 20, 15.6, 18.3 °C, `PRCP` 3.8 mm on the 4th, one call), Strasbourg-
+Entzheim as an entity (`ghcn:FR000007190`: 48.5492, 7.6403, 150 m, records from 1923-05-01 to
+2026-08-31, five elements, `TMAX` from 1924), KNYC as an entity (New York City, Central Park,
+40.78333, -73.96667, 46.9 m, America/New_York, ASOS) and its records then its grid's forecast
+(72 points, 13.3 to 24.4 °C, four calls: the station, its point, its observations, the grid), an unknown GHCN station (no series) and
+an unknown NWS station (404, null). The fixtures in
 `Tests/Fixtures/` are the answers of that day (the NWS's cut to the fields read).
 
 Not verified: a 429 from either (none met; the test feeds one); the NWS's territories outside the

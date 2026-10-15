@@ -3,7 +3,13 @@
 namespace Omnilab\Noaa;
 
 use Omnilab\Exception\NotSupportedException;
+use Omnilab\Model\Domain;
+use Omnilab\Model\Entity;
+use Omnilab\Model\Identifier;
 use Omnilab\Model\Point;
+use Omnilab\Model\Property;
+use Omnilab\Model\Quantity;
+use Omnilab\Model\Scheme;
 use Omnilab\Model\Series;
 use Omnilab\Source\Capability;
 use Omnilab\Source\HttpSource;
@@ -20,13 +26,19 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *   the Global Summary of the Month and of the Year - by the elements' own
  *   names (TMAX, TMIN, TAVG, PRCP, SNOW, SNWD, AWND...) in metric units, at
  *   the nearest station that has them over the period (its search service
- *   finds it), or at a station named (seriesAt());
+ *   finds it), or at a GHCN station named in place of the point
+ *   (Identifier ghcn:USW00094728);
  * - NWS: the National Weather Service's API (api.weather.gov), for a point
  *   of the United States: the observations of the nearest station (the
  *   last seven days) and the forecast of its 2.5 km grid (seven days
  *   ahead), joined when a period spans both, by the API's own names
  *   (temperature, dewpoint, relativeHumidity, windSpeed,
- *   quantitativePrecipitation...).
+ *   quantitativePrecipitation...); at a station named in place of the
+ *   point (nws.station:KNYC), that station's observations and the forecast
+ *   of its grid.
+ *
+ * A station is an entity too (entity()): its name, place and elevation,
+ * and for NCEI the period its records cover, each element's.
  *
  * No key: both are open (NOAA's data are in the U.S. public domain). The
  * NWS refuses a call without a User-Agent (403); the factory sends one.
@@ -103,40 +115,157 @@ final class NoaaSource extends HttpSource
     public function capabilities(): array
     {
         return self::NWS === $this->api
-            ? [Capability::SERIES, Capability::FORECAST, Capability::HISTORICAL]
-            : [Capability::SERIES, Capability::HISTORICAL];
+            ? [Capability::ENTITY, Capability::SERIES, Capability::FORECAST, Capability::HISTORICAL, Capability::STATION]
+            : [Capability::ENTITY, Capability::SERIES, Capability::HISTORICAL, Capability::STATION];
     }
 
-    public function series(SeriesQuery $query): array
+    /** The scheme of this API's stations: GHCN's for NCEI, the NWS's own. */
+    private function scheme(): Scheme
     {
-        if (!$query->place instanceof Point) {
-            throw NotSupportedException::operation('noaa', 'serve a series over an area (a Point: the nearest station answers)');
-        }
-
-        return self::NWS === $this->api ? $this->nws($query, $query->place) : $this->ncei($query, null);
+        return self::NWS === $this->api ? Scheme::NWS_STATION : Scheme::GHCN;
     }
 
     /**
-     * NCEI's series at a station named by its id in the dataset
-     * ("FR000007190", "USW00094728"), outside the contract: the core has
-     * no scheme for a station yet. The query's place is not read.
+     * A station: NCEI's (ghcn:USW00094728) with the period its records
+     * cover and each element's, two calls; the NWS's (nws.station:KNYC),
+     * one. Null when unknown.
+     */
+    public function entity(Identifier|string $id): ?Entity
+    {
+        $station = self::identify($id, $this->scheme()) ?? throw NotSupportedException::identifier('noaa', (string) $id);
+
+        return self::NWS === $this->api ? $this->nwsStation($station) : $this->nceiStation($station);
+    }
+
+    /**
+     * The series at a Point (the nearest station's records, or the NWS's
+     * grid) or at a station named in place of it (ghcn for NCEI,
+     * nws.station for the NWS). An unknown station: no series.
+     */
+    public function series(SeriesQuery $query): array
+    {
+        $station = $this->station($query, $this->scheme());
+        if (null === $station && !$query->place instanceof Point) {
+            throw NotSupportedException::operation('noaa', 'serve a series over an area (a Point: the nearest station answers; or a station)');
+        }
+        if (self::NCEI === $this->api) {
+            return $this->ncei($query, $station?->value);
+        }
+        if (null === $station) {
+            return $this->nws($query, $query->place);
+        }
+        $found = $this->nwsStation($station);
+
+        return null === $found || !$found->place instanceof Point ? [] : $this->nws($query, $found->place, [$station->value, $found->label, $found->place]);
+    }
+
+    /**
+     * NCEI's series at a station named by its id.
+     *
+     * @deprecated since omnilab/noaa 1.x: series() takes the station in place of the point, new SeriesQuery($variables, Identifier::of(Scheme::GHCN, $station), ...)
      *
      * @return list<Series>
      */
     public function seriesAt(string $station, SeriesQuery $query): array
     {
+        @trigger_error('NoaaSource::seriesAt() is deprecated since omnilab/noaa 1.x: give series() the station in place of the point, new SeriesQuery($variables, Identifier::of(Scheme::GHCN, $station), ...).', \E_USER_DEPRECATED);
         if (self::NCEI !== $this->api) {
             throw NotSupportedException::operation('noaa', 'serve a station by its id through the NWS (configured api: ncei)');
         }
-        if (!preg_match('~^[A-Z0-9]{6,20}$~', $station = strtoupper(trim($station)))) {
-            throw new \InvalidArgumentException(\sprintf('"%s" is not a station id of NCEI (FR000007190, USW00094728).', $station));
-        }
+        $id = Identifier::tryOf(Scheme::GHCN, $station) ?? throw new \InvalidArgumentException(\sprintf('"%s" is not a station id of NCEI (FR000007190, USW00094728).', $station));
 
-        return $this->ncei($query, $station);
+        return $this->ncei($query->with(['place' => $id]), $id->value, $query->place instanceof Point ? $query->place : null);
     }
 
-    /** @return list<Series> */
-    private function ncei(SeriesQuery $query, ?string $station): array
+    /** NCEI's station: its search service's record of it in GHCN-Daily, then its elevation from a day of its data. */
+    private function nceiStation(Identifier $station): ?Entity
+    {
+        $found = $this->getJson('search/v1/data', ['dataset' => self::DATASETS[SeriesQuery::DAILY], 'stations' => $station->value, 'limit' => 1]) ?? [];
+        $result = $found['results'][0] ?? null;
+        $record = $result['stations'][0] ?? null;
+        $coordinates = $result['location']['coordinates'] ?? $result['centroid'] ?? null;
+        if (!\is_array($record) || $station->value !== ($record['id'] ?? null) || !\is_array($coordinates) || \count($coordinates) < 2) {
+            return null;
+        }
+        $start = self::time($result['startDate'] ?? null);
+        $end = self::time($result['endDate'] ?? null);
+        $elevation = null;
+        if (null !== $end) {
+            $rows = $this->getJson('data/v1', ['dataset' => self::DATASETS[SeriesQuery::DAILY], 'stations' => $station->value, 'startDate' => $end->format('Y-m-d'), 'endDate' => $end->format('Y-m-d'), 'format' => 'json', 'includeStationLocation' => '1']) ?? [];
+            $elevation = isset($rows[0]['ELEVATION']) && is_numeric($rows[0]['ELEVATION']) ? (float) $rows[0]['ELEVATION'] : null;
+        }
+        $properties = [];
+        if (null !== $elevation) {
+            $properties[] = new Property('elevation', 'Elevation', new Quantity($elevation, 'm'), 'noaa');
+        }
+        if (null !== $start && null !== $end) {
+            $properties[] = new Property('period_start', 'First day of records', $start->format('Y-m-d'), 'noaa');
+            $properties[] = new Property('period_end', 'Last day of records', $end->format('Y-m-d'), 'noaa');
+        }
+        $variables = [];
+        foreach ($record['dataTypes'] ?? [] as $type) {
+            $from = self::time($type['dateRange']['start'] ?? null);
+            $to = self::time($type['dateRange']['end'] ?? null);
+            if (isset($type['id']) && null !== $from && null !== $to) {
+                $variables[(string) $type['id']] = $type['id'].': '.$from->format('Y-m-d').'/'.$to->format('Y-m-d');
+            }
+        }
+        ksort($variables);
+        foreach ($variables as $variable) {
+            $properties[] = new Property('variable', 'Element and the period it covers', $variable, 'noaa');
+        }
+
+        return new Entity(
+            id: $station,
+            label: isset($record['name']) ? (string) $record['name'] : $station->value,
+            domain: Domain::EARTH,
+            kind: 'station',
+            properties: $properties,
+            url: $station->url(),
+            place: new Point((float) $coordinates[1], (float) $coordinates[0], $elevation),
+            source: 'noaa',
+        );
+    }
+
+    /** The NWS's station, as its API describes it. */
+    private function nwsStation(Identifier $station): ?Entity
+    {
+        $data = $this->getJson('stations/'.rawurlencode($station->value), [], ['Accept' => 'application/geo+json']);
+        $properties = $data['properties'] ?? null;
+        $coordinates = $data['geometry']['coordinates'] ?? null;
+        if (!\is_array($properties) || !\is_array($coordinates) || \count($coordinates) < 2) {
+            return null;
+        }
+        $elevation = isset($properties['elevation']['value']) && is_numeric($properties['elevation']['value']) ? round((float) $properties['elevation']['value'], 1) : null;
+        $list = [];
+        if (null !== $elevation) {
+            $list[] = new Property('elevation', 'Elevation', new Quantity($elevation, 'm'), 'noaa');
+        }
+        if (isset($properties['timeZone']) && '' !== $properties['timeZone']) {
+            $list[] = new Property('time_zone', 'Time zone', (string) $properties['timeZone'], 'noaa');
+        }
+        if (isset($properties['provider']) && '' !== $properties['provider']) {
+            $list[] = new Property('network', 'Network', (string) $properties['provider'], 'noaa');
+        }
+
+        return new Entity(
+            id: $station,
+            label: isset($properties['name']) ? (string) $properties['name'] : $station->value,
+            domain: Domain::EARTH,
+            kind: 'station',
+            properties: $list,
+            url: $station->url(),
+            place: new Point((float) $coordinates[1], (float) $coordinates[0], $elevation),
+            source: 'noaa',
+        );
+    }
+
+    /**
+     * @param Point|null $fallback where a station's series without a point are, when the station is unknown (seriesAt()'s point)
+     *
+     * @return list<Series>
+     */
+    private function ncei(SeriesQuery $query, ?string $station, ?Point $fallback = null): array
     {
         $dataset = self::DATASETS[$query->step] ?? throw NotSupportedException::operation('noaa', \sprintf('serve NCEI\'s summaries by a step of %s (P1D: GHCN-Daily, P1M: the month\'s, P1Y: the year\'s)', $query->step));
         $variables = array_map(static fn (string $v) => strtoupper(trim($v)), $query->variables);
@@ -152,7 +281,7 @@ final class NoaaSource extends HttpSource
         $from = self::date($query->from ?? $to->modify('-6 days'), $zone);
 
         $name = null;
-        $place = $query->place;
+        $place = $query->place instanceof Point ? $query->place : $fallback;
         if (null === $station) {
             $found = $this->nearest($dataset, $query->place, $variables, $from, $to);
             if (null === $found) {
@@ -201,6 +330,15 @@ final class NoaaSource extends HttpSource
         while ($cursor <= $to) {
             $steps[$cursor->format($format)] = $cursor;
             $cursor = $cursor->add($interval);
+        }
+
+        if (null === $place) {
+            // A station without records over the period: its place read once.
+            $found = $this->nceiStation(Identifier::of(Scheme::GHCN, (string) $station));
+            if (null === $found || !$found->place instanceof Point) {
+                return [];
+            }
+            [$place, $name] = [$found->place, $found->label];
         }
 
         $series = [];
@@ -290,7 +428,10 @@ final class NoaaSource extends HttpSource
      *
      * @return list<Series>
      */
-    private function nws(SeriesQuery $query, Point $point): array
+    /**
+     * @param array{string, string, Point}|null $given a station named: its id, name and place
+     */
+    private function nws(SeriesQuery $query, Point $point, ?array $given = null): array
     {
         if (!\in_array($query->step, [SeriesQuery::HOURLY, SeriesQuery::DAILY], true)) {
             throw NotSupportedException::operation('noaa', \sprintf('serve the NWS by a step of %s (PT1H, or P1D aggregated)', $query->step));
@@ -307,7 +448,7 @@ final class NoaaSource extends HttpSource
         $now = $this->now();
         $from = null === $query->from ? $now->setTimezone($zone)->setTime(0, 0) : self::date($query->from, $zone);
         $to = (null === $query->to ? $from->modify('+6 days') : self::date($query->to, $zone))->setTime(23, 59, 59);
-        if (!\is_array($properties)) {
+        if (!\is_array($properties) && null === $given) {
             // Outside the NWS's grids (a point beyond the United States): nothing.
             return array_map(static fn (string $v) => new Series($v, null, $point, [], $daily ? SeriesQuery::DAILY : null, $query->aggregation, forecast: null, source: 'noaa'), $query->variables);
         }
@@ -319,12 +460,18 @@ final class NoaaSource extends HttpSource
         $stationLabel = null;
         $gridLabel = null;
         if ($from < $now) {
-            $stations = isset($properties['observationStations']) ? $this->getJson((string) $properties['observationStations'], ['limit' => 1], ['Accept' => 'application/geo+json']) : null;
-            $station = $stations['features'][0] ?? null;
+            $station = null;
+            if (null !== $given) {
+                [$id, $name, $place] = $given;
+                $station = ['properties' => ['stationIdentifier' => $id, 'name' => $name]];
+            } else {
+                $stations = isset($properties['observationStations']) ? $this->getJson((string) $properties['observationStations'], ['limit' => 1], ['Accept' => 'application/geo+json']) : null;
+                $station = $stations['features'][0] ?? null;
+            }
             if (\is_array($station) && isset($station['properties']['stationIdentifier'])) {
                 $id = (string) $station['properties']['stationIdentifier'];
                 $coordinates = $station['geometry']['coordinates'] ?? null;
-                if (\is_array($coordinates) && \count($coordinates) >= 2) {
+                if (null === $given && \is_array($coordinates) && \count($coordinates) >= 2) {
                     $place = new Point((float) $coordinates[1], (float) $coordinates[0], isset($station['properties']['elevation']['value']) ? (float) $station['properties']['elevation']['value'] : null);
                 }
                 $stationLabel = trim(($station['properties']['name'] ?? '').' ('.$id.')');

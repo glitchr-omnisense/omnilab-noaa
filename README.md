@@ -1,6 +1,6 @@
 # omnilab/noaa
 
-NOAA's weather and climate observations for [glitchr/omnilab](https://github.com/glitchr-studio/omnilab),
+NOAA's weather and climate observations for [omniscient/omnilab](https://github.com/glitchr-studio/omnilab),
 as series at a point: the station records of the whole world from NCEI's Access Data Service -
 GHCN-Daily by day, the Global Summary of the Month and of the Year, by the elements' own names
 (`TMAX`, `TMIN`, `TAVG`, `PRCP`, `SNOW`, `AWND`...) in metric units - at the nearest station that

@@ -1,5 +1,11 @@
 # omnilab/noaa
 
+NOAA's observations as series for [omnisense/omnilab](https://github.com/glitchr-omnisense/omnilab):
+NCEI's station records of the world (GHCN-Daily, the monthly and yearly summaries, through
+`https://www.ncei.noaa.gov/access/services/`) at the nearest station or one named, and the
+National Weather Service's observations and forecasts in the United States
+(`https://api.weather.gov/`) at a point or a station; the stations themselves as entities. No key.
+
 ## Installation
 
 ```sh
@@ -18,6 +24,52 @@ $nws = (new NoaaSourceFactory($httpClient))->create(['api' => 'nws', 'mailto' =>
 
 With the Symfony bundle, the factory is registered as `noaa` when the bundle knows it; otherwise
 register `NoaaSourceFactory` as a service (it is autoconfigured as a `SourceFactoryInterface`).
+
+## Credentials
+
+None: neither NCEI's Access Data Service nor the NWS's API takes a key. The NWS requires a
+User-Agent that says who calls (403 without one): the factory sends `omnilab/1.x` with the `mailto`
+address. CDO v2, NCEI's older API, needs a token: it is not used.
+
+## Options
+
+The factory's options, with the defaults it applies (`NoaaSourceFactory`; the capabilities below are `ncei`'s, the default):
+
+| Option | Type | Default | Required | Effect |
+|---|---|---|---|---|
+| `api` | `string` | `ncei` | no | `ncei` (NCEI's station records of the world) or `nws` (the National Weather Service, the United States): a source of its own each; another is an `\InvalidArgumentException` at `create()` |
+| `radius_km` | `float` | `50` | no | NCEI: how far from a `Point` the nearest station is looked for, in kilometres |
+| `timezone` | `?string` | null | no | the zone of the days and times when a query does not say: `local` (the NWS point's own), `UTC`, `America/New_York`...; null: local for the NWS, UTC for NCEI |
+| `now` | `?string` | null | no | the time taken for now (tests); null: the real one |
+| `mailto` | `?string` | null | no | a contact address, in the User-Agent, which the NWS requires |
+| `user_agent` | `?string` | null | no | the whole User-Agent, in place of the one made from `mailto` |
+| `throttle` | `float` | `0` | no | seconds left between two calls: neither API publishes a figure |
+| `base_uri` | `string` | null | no | null: the API's own - `https://www.ncei.noaa.gov/access/services/` (ncei), `https://api.weather.gov/` (nws) |
+
+## Capabilities
+
+`capabilities()` answers `entity`, `series`, `historical`, `station`; an operation it does not answer throws `NotSupportedException` before any call.
+
+| Capability | Supported | |
+|---|---|---|
+| `entity` | yes | a station: a GHCN one (`ghcn:USW00094728`, two calls) for `ncei`, an NWS one (`nws.station:KNYC`, one call) for `nws`; another scheme refused before any call |
+| `search` | no |  |
+| `series` | yes | `ncei`: GHCN-Daily and the monthly and yearly summaries (`TMAX`, `PRCP`...) at a station or the nearest one of a `Point`; `nws`: a point's or a station's observations, then its grid's forecast, hourly or daily |
+| `products` | no |  |
+| `occurrences` | no |  |
+| `datasets` | no |  |
+| `jobs` | no |  |
+| `open` | no |  |
+| `structure` | no |  |
+| `cross_references` | no | none: a station gives no other base's id |
+| `forecast` | no | `nws` only: its capabilities add `forecast` (the grid's forecast) |
+| `historical` | yes | NCEI's records; the NWS's observations of the last seven days |
+| `area` | no | a box is refused before any call |
+| `station` | yes | `ghcn` for `ncei`, `nws.station` for `nws` |
+| `cloud_cover` | no |  |
+
+Outside the contract, deprecated: `seriesAt(string $station, SeriesQuery $query)` (`ncei`), which
+`series()` with a station's `Identifier` replaced.
 
 ## Which API
 
@@ -117,6 +169,58 @@ does not give a GHCN station's WMO index, which only its station list file holds
 names none). Wikidata keeps WIGOS ids (P4136, 1,594 items on 2026-10-15), which neither API
 reads.
 
+## Example
+
+```php
+<?php
+
+require __DIR__.'/vendor/autoload.php';
+
+use Omnilab\Model\Identifier;
+use Omnilab\Model\Point;
+use Omnilab\Model\Scheme;
+use Omnilab\Noaa\NoaaSourceFactory;
+use Omnilab\Source\SeriesQuery;
+use Symfony\Component\HttpClient\HttpClient;
+
+$http = HttpClient::create(['timeout' => 60]);
+$ncei = (new NoaaSourceFactory($http))->create(['mailto' => 'you@example.org']);
+$nws = (new NoaaSourceFactory($http))->create(['mailto' => 'you@example.org', 'api' => 'nws']);
+
+// Central Park's own daily records (GHCN-Daily).
+[$tmax, $prcp] = $ncei->series(new SeriesQuery(['TMAX', 'PRCP'], Identifier::of(Scheme::GHCN, 'USW00094728'), new DateTimeImmutable('2026-10-01'), new DateTimeImmutable('2026-10-07'), SeriesQuery::DAILY));
+printf("%s: TMAX %s %s, PRCP %s %s\n", $tmax->label, implode(' ', $tmax->values()), $tmax->unit, implode(' ', $prcp->values()), $prcp->unit);
+
+// The NWS's forecast for a point of Manhattan, tomorrow, hourly.
+[$temperature] = $nws->series(new SeriesQuery(['temperature'], new Point(40.7812, -73.9665), new DateTimeImmutable('tomorrow'), new DateTimeImmutable('tomorrow')));
+printf("%s: %d hours, %s to %s %s, forecast %s\n", $temperature->label, count($temperature), $temperature->min(), $temperature->max(), $temperature->unit, var_export($temperature->forecast, true));
+```
+
+```
+NY CITY CENTRAL PARK, NY US (daily-summaries:USW00094728): TMAX 24.4 28.3 21.1 16.7 20 15.6 18.3 °C, PRCP 0 0 0 3.8 0 0 0 mm
+NWS OKX grid 34,45: 24 hours, 7.2222222222222 to 16.666666666667 °C, forecast true
+```
+
+(as answered on 2026-10-27: NCEI's call at the station, the NWS's point and grid; the NWS's grid gives its own unit, here °C)
+
+```yaml
+# config/packages/omnilab.yaml
+omnilab:
+    sources:
+        noaa: { factory: noaa, options: { mailto: '%env(OMNILAB_MAILTO)%' } }
+        nws: { factory: noaa, options: { mailto: '%env(OMNILAB_MAILTO)%', api: nws } }
+```
+
+## Errors
+
+Every call goes through `HttpSource`: a 404 or a 410 (and a 204) is null - an empty page for a list -; a 429 is a `RateLimitedException` (`retryAfter` from `Retry-After`); a 5xx, a time-out or a host that does not answer an `UnavailableException`; any other 4xx a `ProviderException` with its `status` and what the service said; an answer that is not JSON a `ProviderException`, a web page answered for JSON an `UnavailableException`.
+
+NOAA's own: NCEI answers 400 with a JSON body that names the parameter it refuses, read into the
+`ProviderException`'s message; the NWS answers 403 without a User-Agent, 429 past its "generous"
+limit. An unknown station, or no station near a point, answers an empty list (no series). Before
+any call (`NotSupportedException`): a box, a station of the other API's scheme, a step NCEI's
+summaries do not have, an aggregation of NCEI's own summaries, a daily NWS query without one.
+
 ## Verified, and not
 
 Against the real services on 2026-10-15: GHCN-Daily at Strasbourg for 2026-08-01 to 08-07
@@ -142,6 +246,19 @@ Entzheim as an entity (`ghcn:FR000007190`: 48.5492, 7.6403, 150 m, records from 
 an unknown NWS station (404, null). The fixtures in
 `Tests/Fixtures/` are the answers of that day (the NWS's cut to the fields read).
 
+Again on 2026-10-27: Central Park's daily TMAX and PRCP of 1 to 7 October 2026 at its GHCN station,
+the NWS's hourly forecast for a point of Manhattan (the example above).
+
 Not verified: a 429 from either (none met; the test feeds one); the NWS's territories outside the
 50 states; the monthly and yearly summaries' less common elements (only `TAVG` and `PRCP` read
 live).
+
+## Responsibility
+
+This package is an independent, unofficial client: it is not affiliated with, endorsed by or
+sponsored by NOAA, NCEI or the National Weather Service. NOAA's data are in the U.S. public
+domain; credit NOAA (NCEI, the National Weather Service) where they are shown, and send a
+User-Agent that says who calls, as the README's
+[Terms of use](https://github.com/glitchr-omnisense/omnilab-noaa#terms-of-use) says. Whoever runs
+the package is responsible for any use made of what it returns: see the README's
+[Responsibility](https://github.com/glitchr-omnisense/omnilab-noaa#responsibility) section.

@@ -217,9 +217,10 @@ Every call goes through `HttpSource`: a 404 or a 410 (and a 204) is null - an em
 
 NOAA's own: NCEI answers 400 with a JSON body that names the parameter it refuses, read into the
 `ProviderException`'s message; the NWS answers 403 without a User-Agent, 429 past its "generous"
-limit. An unknown station, or no station near a point, answers an empty list (no series). Before
-any call (`NotSupportedException`): a box, a station of the other API's scheme, a step NCEI's
-summaries do not have, an aggregation of NCEI's own summaries, a daily NWS query without one.
+limit. An unknown station answers an empty list (no series); no station near a point, a series
+without points per variable. Before any call (`NotSupportedException`): a box, a station of the
+other API's scheme, a step NCEI's summaries do not have, an aggregation of NCEI's own summaries, a
+daily NWS query without one.
 
 ## Verified, and not
 

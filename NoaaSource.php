@@ -107,6 +107,12 @@ final class NoaaSource extends HttpSource
         parent::__construct($http, $baseUri ?? (self::NWS === $api ? self::NWS_URI : self::NCEI_URI), $headers, $throttle);
     }
 
+    /** "nws" for the National Weather Service's API, "ncei" for NCEI's Access Data Service: two services, two policies of their own. */
+    protected function operation(string $method, string $url): string
+    {
+        return str_contains($url, 'api.weather.gov') ? self::NWS : self::NCEI;
+    }
+
     public function getName(): string
     {
         return 'noaa';

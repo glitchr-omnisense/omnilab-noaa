@@ -60,6 +60,18 @@ used.
 
 See [docs/](docs/index.md) for what is read, how it maps, and what is left out.
 
+## Usage policy
+
+Declared as data in [`policy.json`](policy.json) (read at https://www.weather.gov/documentation/services-web-api on 2026-11-10), and honoured on every request by the
+core: a limit reached waits when its window ends within `max_wait` seconds, else the request is not
+sent ([Usage policies](https://github.com/glitchr-omnisense/omnilab/blob/1.x/docs/policies.md)).
+
+- Limits: not published (unknown).
+- Licence: US public domain (17 U.S.C. 105); commercial use: allowed.
+- Credit: not required: NOAA National Centers for Environmental Information (NCEI); NOAA National Weather Service (https://www.ncei.noaa.gov/).
+- Needs: a User-Agent.
+- NCEI (`ncei`) and the National Weather Service (`nws`) are counted apart, each a service of its own.
+
 ## Responsibility
 
 This package is an independent, unofficial client: it is not affiliated with, endorsed by or

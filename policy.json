@@ -1,0 +1,40 @@
+{
+    "$schema": "https://github.com/glitchr-omnisense/contracts/blob/1.x/resources/usage-policy.schema.json",
+    "provider": "noaa",
+    "rateLimits": null,
+    "concurrency": null,
+    "rights": {
+        "commercial": "allowed",
+        "openSourceRequired": null,
+        "caching": {
+            "permission": "allowed",
+            "maxTtl": null
+        },
+        "storage": "allowed",
+        "redistribution": "allowed",
+        "attribution": {
+            "required": false,
+            "text": "NOAA National Centers for Environmental Information (NCEI); NOAA National Weather Service",
+            "url": "https://www.ncei.noaa.gov/",
+            "where": [
+                "source"
+            ]
+        },
+        "licence": "US public domain (17 U.S.C. 105)"
+    },
+    "requirements": {
+        "key": false,
+        "userAgent": {
+            "required": true,
+            "pattern": null
+        }
+    },
+    "provenance": {
+        "terms": "https://www.weather.gov/disclaimer",
+        "policy": "https://www.weather.gov/documentation/services-web-api",
+        "verifiedAt": "2026-11-10",
+        "declaredBy": "maintainer",
+        "contact": "nco.ops@noaa.gov",
+        "notes": "Two APIs: operation 'ncei' = https://www.ncei.noaa.gov/access/services/ (NCEI Access Data Service; its documentation page https://www.ncei.noaa.gov/support/access-data-service-api-user-documentation states no rate limit, no key, no licence, HTTPS only); operation 'nws' = https://api.weather.gov/ (NWS API: 'A User Agent is required to identify your application', e.g. '(myweatherapp.com, contact@myweatherapp.com)'; 'reasonable rate limits ... The rate limit is not public information'; exceeding it returns an error; cache-friendly design, grid lookups may be cached). The User-Agent requirement is the NWS's; NCEI states none. NWS information is in the public domain 'and may be used without charge for any lawful purpose' (weather.gov/disclaimer), provided it is not modified and presented as official, nor used to imply NOAA/NWS endorsement; credit not required. NCEI's open data policy places archived data in the US public domain; GHCN-Daily's metadata asks users to cite the dataset (a request). NWS operational issues: nco.ops@noaa.gov; NCEI contact: https://www.ncei.noaa.gov/contact. Read 2026-11-10."
+    }
+}

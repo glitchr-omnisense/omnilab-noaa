@@ -1,0 +1,409 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 4
+			path: NoaaSource.php
+
+		-
+			message: '#^Binary operation "\." between mixed and '' \('' results in an error\.$#'
+			identifier: binaryOp.invalid
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Binary operation "\." between mixed and ''\: '' results in an error\.$#'
+			identifier: binaryOp.invalid
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''ELEVATION'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''centroid'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''coordinates'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 4
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''dateRange'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 4
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''elevation'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''end'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''endDate'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''forecastGridData'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''gridId'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''gridX'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''gridY'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''id'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''location'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''name'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''next'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''properties'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''start'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''startDate'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''stationIdentifier'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''stations'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''timeZone'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''timestamp'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''validTime'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset ''value'' on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 3
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset 0 on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 4
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot access offset string on mixed\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot cast mixed to float\.$#'
+			identifier: cast.double
+			count: 9
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot cast mixed to string\.$#'
+			identifier: cast.string
+			count: 17
+			path: NoaaSource.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Method Omnilab\\Noaa\\NoaaSource\:\:nws\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Method Omnilab\\Noaa\\NoaaSource\:\:series\(\) should return list\<Omnilab\\Model\\Series\> but returns array\.$#'
+			identifier: return.type
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#1 \$time of static method Omnilab\\Source\\HttpSource\:\:time\(\) expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 7
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#1 \$timezone of class DateTimeZone constructor expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#1 \$value of function count expects array\|Countable, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#2 \$point of method Omnilab\\Noaa\\NoaaSource\:\:nearest\(\) expects Omnilab\\Model\\Point, Omnilab\\Model\\BBox\|Omnilab\\Model\\Identifier\|Omnilab\\Model\\Point given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#2 \.\.\.\$values of function sprintf expects bool\|float\|int\|string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#3 \$place of method Omnilab\\Noaa\\NoaaSource\:\:nceiSeries\(\) expects Omnilab\\Model\\Point, Omnilab\\Model\\Point\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#3 \.\.\.\$values of function sprintf expects bool\|float\|int\|string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Parameter \#4 \.\.\.\$values of function sprintf expects bool\|float\|int\|string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSource.php
+
+		-
+			message: '#^Cannot cast mixed to float\.$#'
+			identifier: cast.double
+			count: 2
+			path: NoaaSourceFactory.php
+
+		-
+			message: '#^Cannot cast mixed to string\.$#'
+			identifier: cast.string
+			count: 1
+			path: NoaaSourceFactory.php
+
+		-
+			message: '#^Parameter \#3 \$baseUri of class Omnilab\\Noaa\\NoaaSource constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSourceFactory.php
+
+		-
+			message: '#^Parameter \#5 \$timezone of class Omnilab\\Noaa\\NoaaSource constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSourceFactory.php
+
+		-
+			message: '#^Parameter \#6 \$now of class Omnilab\\Noaa\\NoaaSource constructor expects string\|null, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: NoaaSourceFactory.php
+
+		-
+			message: '#^Access to an undefined property Omnilab\\Model\\BBox\|Omnilab\\Model\\Point\:\:\$elevation\.$#'
+			identifier: property.notFound
+			count: 3
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Access to an undefined property Omnilab\\Model\\BBox\|Omnilab\\Model\\Point\:\:\$latitude\.$#'
+			identifier: property.notFound
+			count: 4
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Access to an undefined property Omnilab\\Model\\BBox\|Omnilab\\Model\\Point\:\:\$longitude\.$#'
+			identifier: property.notFound
+			count: 4
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$domain on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$elevation on Omnilab\\Model\\BBox\|Omnilab\\Model\\Point\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$id on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$kind on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$label on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$latitude on Omnilab\\Model\\BBox\|Omnilab\\Model\\Point\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$longitude on Omnilab\\Model\\BBox\|Omnilab\\Model\\Point\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$place on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: property.nonObject
+			count: 5
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot access property \$url on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot call method properties\(\) on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot call method property\(\) on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Cannot call method value\(\) on Omnilab\\Model\\Entity\|null\.$#'
+			identifier: method.nonObject
+			count: 4
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Method Omnilab\\Noaa\\Tests\\NoaaSourceTest\:\:source\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Parameter \#1 \$haystack of function str_starts_with expects string, array\<mixed\>\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Parameter \#1 \$options of method Omnilab\\Source\\SourceFactory\:\:create\(\) expects array\<string, mixed\>, array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Parameter \#1 \.\.\.\$arrays of function array_merge expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Parameter \#2 \$array of function implode expects array\<string\>, array\<mixed, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: Tests/NoaaSourceTest.php
+
+		-
+			message: '#^Property Omnilab\\Noaa\\Tests\\NoaaSourceTest\:\:\$headers \(list\<array\<string, string\>\>\) does not accept non\-empty\-list\<mixed\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: Tests/NoaaSourceTest.php

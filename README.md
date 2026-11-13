@@ -48,6 +48,39 @@ omnilab:
                 mailto: 'support@glitchr.io'   # the NWS refuses a call without a User-Agent
 ```
 
+## Install and a first call
+
+```sh
+composer require omnilab/noaa
+```
+
+A real call, with no account and no key: the daily highs at Central Park in the first week of
+October 2026, from NCEI's GHCN-Daily records. `mailto` is your address, sent in the User-Agent so
+that the service can reach you before it blocks a caller; the source keeps to the limits its
+[`policy.json`](policy.json) declares.
+
+```php
+<?php
+
+require __DIR__.'/vendor/autoload.php';
+
+use Omnilab\Model\Identifier;
+use Omnilab\Model\Scheme;
+use Omnilab\Noaa\NoaaSourceFactory;
+use Omnilab\Source\SeriesQuery;
+
+$noaa = (new NoaaSourceFactory())->create(['mailto' => 'you@example.org']);   // your address, in the User-Agent
+[$tmax] = $noaa->series(new SeriesQuery(['TMAX'], Identifier::of(Scheme::GHCN, 'USW00094728'),
+    new DateTimeImmutable('2026-10-01'), new DateTimeImmutable('2026-10-07'), SeriesQuery::DAILY));
+echo $tmax->label, ': ', implode(' ', $tmax->values()), ' ', $tmax->unit, "\n";
+```
+
+Its output on 2026-11-13:
+
+```
+NY CITY CENTRAL PARK, NY US (daily-summaries:USW00094728): 24.4 28.3 21.1 16.7 20 15.6 18.3 °C
+```
+
 ## Terms of use
 
 NOAA's data are in the U.S. public domain; credit NOAA (NCEI, the National Weather Service) where
